@@ -3,10 +3,14 @@ require('dotenv').config();
 const express     = require('express');
 const bodyParser  = require('body-parser');
 const cors        = require('cors');
-
+const crypto = require('crypto');
+const helmet = require('helmet');
+const { anonymizeIP } = require('./routes/utils');
 const apiRoutes         = require('./routes/api.js');
 const fccTestingRoutes  = require('./routes/fcctesting.js');
 const runner            = require('./test-runner');
+const { default: mongoose } = require('mongoose');
+
 
 const app = express();
 
@@ -16,6 +20,39 @@ app.use(cors({origin: '*'})); //For FCC testing purposes only
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+
+app.use((req, res, next) => {
+  const userIP = req.ip;
+  const anonymizedIP = anonymizeIP(userIP);
+
+  req.anonymizedIP = anonymizedIP;
+
+  next();
+});
+
+app.use(helmet());
+
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'"],
+    },
+  })
+);
+
+mongoose.connect(process.env.DB, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => {
+  console.log('Connected to MongoDB');
+})
+.catch((error) => {
+  console.error('MongoDB connection error: ' + error);
+})
 
 //Index page (static HTML)
 app.route('/')
